@@ -27,6 +27,7 @@ To add a new account using a previously used email address I had to add add a + 
 if the email used for the first account was name.surname@domain.tld the email for the second account can be name.surname+1@domain.tld
 
 Otherwise I would receive an email stating:
+
 ![AWS email](images/aws_email_already_associated_with_an_account.png?raw=true "AWS email")
 
 Once a created the second account, I verified that it had nothing in common with the account previously created using the same email address apart the email recipient where they will send communications to. They cannot see each other and the 2 root accounts have a different credentials. One has to specify the + symbol and the additional characters between the first part of the email and the '@' symbol and a different password to access the second account generated with a common email.
