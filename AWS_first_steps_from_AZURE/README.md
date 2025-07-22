@@ -1,23 +1,27 @@
 # Exploring AWS from an Azure background (sharing my beginner understanding of AWS)
-## Accounts and Accounts' access 
-The first things I considered when I started working with AWS was where to create the resources and how to access them, concious that for cloud security identity access and management is paramount. 
+## IAM, Accounts and Accounts' access 
+I wrote this text to remind myself of my experience with AWS. I would be pleased if my notes can also help somebody else approaching AWS starting from an Azure outlook. I would also be glad if any error on the below can be brought to my attention and for any other meaningful suggestion.
 
-When one signs up for an AWS account he/she will have to specify an email address which will become the root user with all the powers over the account. Best practice suggests to protect that account with MFA, possibly remove its app key and don't use it for ordinary operations. One can create one or more IAM accounts to build infrastructure in the account.
+The first things I considered when I started working with AWS was where to create the resources and how to access them. In Azure I was used to create my resources in a Resource Group and access them with a user created in the Azure Active Directory which is generated automatically when a new tenant is created. I was also concious that identity access and management (IAM) is paramount for cloud security. 
 
-Once created an IAM user and and logged on with it, one can create resources in the account providing the user has the correct role/permission. The account is the equivalent of an Azure Resource Group or even a subscription. They are a logical containers for the resources.
+When one signs up for an AWS account he/she will have to specify an email address which will become the root user with all the powers over the account. Best practice suggests to protect that account with MFA, possibly remove its app keys and don't use it for ordinary operations. The root user can create IAM users and roles that can be used to build and/or access the infrastructure within the account. So AWS and Azure are similar in the way that the root user (AWS) or the Account Administrator (Azure) have all the powers on the respective tenants. They should not be used for ordinary operations, they should be protected with MFA and they can create users to which assign roles and permissions to other users which will run ordinary task. In Azure these ordinary users are created in a directory (AAD - Azure Active Directory) while in AWS they are created within the account. 
 
-Accounts in AWS are isolated from each other, Azure's Resource Groups are not. This means that an AWS IAM user cannot access resources in different accounts, while an Azure user can access resources in different Resource Groups provided that it has the correct RBAC (role based access control) permission.
+Initially my understanding was that an AWS account is the equivalent of an Azure Resource Group: a logical container where the resources are placed. But since every AWS account is isolated from each other, I thought they are more like an Azure Subscription, which before the Azure ARM api where the only logical container for Azure cloud resources. The article at https://learn.microsoft.com/en-us/azure/architecture/aws-professional/accounts#aws-accounts-vs-azure-subscriptions confirms the latter.
 
-AWS offers structures like Organizations, AWS IAM Identity Center and AWS Control Tower to allow users to access multiple accounts and manage the accounts themselves, I will look into these later.
-   
-## Add an Account from the portal
-First thing I want to see if adding a new account from the portal using the same email address I used to create my first account can build some inter-account visibility.
+My thought at this point was that I would still use an AWS account as if it was an Azure Resource Group and create in there all the resources that share the same lifecycle. The problem with this approach would be how to allow cross-account communication. There are several ways to do that and a full explanation can be found in the AWS documentation:
+* Cross account resource access in IAM - https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies-cross-account-resource-access.html
+* AWS Organizations - https://docs.aws.amazon.com/organizations/latest/userguide/orgs_introduction.html . This can be extended with AWS Control Tower - https://docs.aws.amazon.com/accounts/latest/reference/when-to-use-control-tower.html
+* AWS IAM Identity Center - https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html
 
-I logged on to the portal using the root account and checked the account settings.
+I found interesting the video at https://www.youtube.com/watch?v=QZKpufELZCA&pp=0gcJCfwAo7VqN5tD that talks about "AWS IAM vs IAM Identity Center"
 
-To access the account with an IAM account I should reach a url that looks like https://[account_number].signin.aws.amazon.com/console, but I can create an alias (from the IAM service dashbord link) for it which would let me access a more memorable https://[alias_name].signin.aws.amazon.com/console.
+## Adding Accounts
+### Add an Account from the portal
+I tried was to create 2 accounts from the AWS portal using the same email address.
 
-From within an account I cannot create another account.
+I already created one account, so I logged on to the portal using the root account user and checked the account's settings.
+
+The url to use to access an AWS account looks like https://[account_number].signin.aws.amazon.com/console. The account number can be difficult to remember, but one can create an alias for it (from the IAM service dashbord link) which would allow to use a more memorable url: https://[alias_name].signin.aws.amazon.com/console.
 
 To add a new account using a previously used email address I had to add add a + symbol and something between the first part of the address and the '@' symbol e.g.:
 if the email used for the first account was name.surname@domain.tld the email for the second account can be name.surname+1@domain.tld
@@ -25,12 +29,463 @@ if the email used for the first account was name.surname@domain.tld the email fo
 Otherwise I would receive an email stating:
 ![AWS email](images/aws_email_already_associated_with_an_account.png?raw=true "AWS email")
 
-Once a created the second account, I realized that the 2 accounts created using the same email address have nothing in common apart the email recipient where they will send communications to. They cannot see each other and the 2 root accounts have a different credentials. One has to specify the + symbol and the additional characters between the first part of the email and the '@' symbol and a different password to access the second account generated with a common email.
+Once a created the second account, I verified that it had nothing in common with the account previously created using the same email address apart the email recipient where they will send communications to. They cannot see each other and the 2 root accounts have a different credentials. One has to specify the + symbol and the additional characters between the first part of the email and the '@' symbol and a different password to access the second account generated with a common email.
 
-## Add an Organization from the portal
-To manage more accounts - which we can think as resources' containers - from the same user I need to build an organization.
+### Add an Account from the command line
+This is currently not possible as documented in the "AWS CLI & SDKs" tab in the article at https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-creating.html 
 
-I logged on as my root account and searched for organization in the AWS console.
+## Cross account resource access in IAM (using the AWS cli)
+To learn how to share a resource between accounts I looked at the article published at https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies-cross-account-resource-access.html and in order to get it working I had to slightly modify the policies shown in the article. Below you can also find the command line commands I used to verify the resource access. The documentation explains that we need to create policies to share resources and that there are identity-based policies and resource-based policies, see 
+https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_identity-vs-resource.html
+
+An s3 bucket, which is similar to an Azure Storage Account, supports the Cross-account access using resource-based policies. 
+
+From the AWS portal I created a new account named 'acca' and an IAM user named 'accau1'. I assigned to the accau1 user the AmazonS3FullAccess policy and created the security credentials to use the account via aws cli.
+
+On my laptop I created a new AWS configure profile to use the newly created user accau1
+```
+aws configure --profile accau1 
+AWS Access Key ID [None]: AKIAXKXXXXXXXXXXXXXX
+AWS Secret Access Key [None]: 05+vNgxMEwHjXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Default region name [None]: ca-central-1                            
+Default output format [None]: json
+```
+I checked that there are no s3 buckets in this account
+```
+aws --profile accau1 s3api list-buckets
+{
+    "Buckets": [],
+    "Owner": {
+        "ID": "193ebf5335cf47ea87b27049455fa04604cf8308103b9a33e80f68e85c5777b6"
+    },
+    "Prefix": null
+}
+```
+I created an s3 Bucket
+```
+aws --profile accau1 s3api create-bucket \
+              --bucket accau1-s3-demo-bucket \
+              --region ca-central-1 \
+              --create-bucket-configuration LocationConstraint=ca-central-1
+
+{
+    "Location": "http://accau1-s3-demo-bucket.s3.amazonaws.com/"
+}
+```
+I checked again for s3 buckets to verify that the bucket has now been created.
+```
+aws --profile accau1 s3api list-buckets
+{
+    "Buckets": [
+        {
+            "Name": "accau1-s3-demo-bucket",
+            "CreationDate": "2025-07-16T19:11:13+00:00"
+        }
+    ],
+    "Owner": {
+        "ID": "193ebf5335cf47ea87b27049455fa04604cf8308103b9a33e80f68e85c5777b6"
+    },
+    "Prefix": null
+}
+```
+
+From the AWS portal I created a second account named 'accb' and an IAM user named 'accbu1'. I assigned to the accbu1 user the AmazonS3ReadOnlyAccess policy and created the security credentials to use the account via cli.
+
+I created an AWS configure profile for the user accbu1 and confirmed that I cannot see any bucket using this second account. (N.B.: This is not the right cmmand to see if the policy had effect but it shows that no s3 buckets are present in this account)
+
+```
+aws --profile accbu1 s3api list-buckets
+{
+    "Buckets": [],
+    "Owner": {
+        "ID": "16e1f4d01ea6fabba8db285b765bec1bf15efd19255b7d29c603f9c6ae26b1cb"
+    },
+    "Prefix": null
+}
+```
+I than checked that there are no bucket policies attached to the newly created s3 bucket  using the accau1 user
+```
+aws --profile accau1 s3api get-bucket-policy --bucket accau1-s3-demo-bucket
+
+An error occurred (NoSuchBucketPolicy) when calling the GetBucketPolicy operation: The bucket policy does not exist
+```
+
+I created the aws-x-account-policy.json file for a policy that I named aws-x-account-policy. (N.B.: this is slighltly different from the one on the AWS documentation)
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PrincipalAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::816351727812:root"},
+            "Action": "s3:*",
+            "Resource": "arn:aws:s3:::accau1-s3-demo-bucket",
+            "Resource": "arn:aws:s3:::accau1-s3-demo-bucket/*"
+            }
+        ]
+}
+```
+And attached it as resource-based policy to the newly created bucket. This will allow all principals in in the accb full access to the bucket in the acca account if granted any s3 permissions.
+
+```
+aws --profile accau1 s3api put-bucket-policy --bucket accau1-s3-demo-bucket --policy file://aws-x-account-policy.json
+```
+N.B.: no output returned
+
+I checked if the policy has been applied:
+```
+aws --profile accau1 s3api get-bucket-policy --bucket accau1-s3-demo-bucket
+{
+    "Policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"PrincipalAccess\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::816351727812:root\"},\"Action\":\"s3:*\",\"Resource\":\"arn:aws:s3:::accau1-s3-demo-bucket\"}]}"
+}
+```
+
+I then created the policy file aws-guest-policy.json. (N.B.: again, this is slighltly different from the one on the AWS documentation)
+
+```
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": [
+				"s3:Get*",
+				"s3:List*",
+				"s3:PutObject"
+			],
+			"Resource": [
+				"arn:aws:s3:::accau1-s3-demo-bucket",
+				"arn:aws:s3:::accau1-s3-demo-bucket/*"
+			]
+		}
+	]
+}
+```
+
+When I attempted to create the policy via cli I received an error
+
+```
+aws --profile accbu1 iam create-policy \
+    --policy-name aws-guest-policy \
+    --policy-document file://aws-guest-policy.json
+
+An error occurred (AccessDenied) when calling the CreatePolicy operation: User: arn:aws:iam::816351727812:user/accbu1 is not authorized to perform: iam:CreatePolicy on resource: policy aws-guest-policy because no identity-based policy allows the iam:CreatePolicy action
+```
+To save time I created the policy from the portal, the command to assign a policy to a user would look like the below:
+```
+aws iam attach-user-policy --user-name john.doe --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+```
+
+From the portal I attached the policy to the accb account IAM user named accbu1. This user is now configured with 2 policies: the AmazonS3ReadOnlyAccess and the aws-guest-policy I just created.
+
+I have then added from the portal 2 files to the s3 bucket and tested the access to the files from both accounts. The command to test the bucket access is the following. Below you can see that the bucket can be accessed by both the acca and accb accounts.
+```
+aws --profile accau1 s3 ls s3://accau1-s3-demo-bucket
+2025-07-17 12:54:07     981811 Copilot_20250711_150601.png
+2025-07-16 22:00:46    1063180 Copilot_20250711_152727.png
+
+---
+
+aws --profile accbu1 s3 ls s3://accau1-s3-demo-bucket
+2025-07-17 12:54:07     981811 Copilot_20250711_150601.png
+2025-07-16 22:00:46    1063180 Copilot_20250711_152727.png
+```
+But I would have had the same result if I had applied to the accb account IAM user named accbu1 only the AmazonS3ReadOnlyAccess policy. This because the account principal (the root account accb) has been given the s3 bucket full control with the policy attached to the bucket created in the acca account.
+
+With either or both the AmazonS3ReadOnlyAccess and aws-guest-policy policies I can list the blob in the s3 bucket.
+
+Plase note that the policies I created are slightly different from the one on the Amazon Documentation regarding the aws resources cross account access (https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies-cross-account-resource-access.html). Using the reource "arn:aws:s3:::accau1-s3-demo-bucket/* *" (with the /* * at the end like in the AWS documentation) I was unable to succeed with the command 
+```
+aws s3 ls
+```
+so I used the resource "arn:aws:s3:::accau1-s3-demo-bucket" (without the /* at the end).
+Since I also wanted to try to write in the bucket from both accounts, I added the action "s3:PutObject" in the user policy in the account invited to access the s3 bucket (accb). To have this working I had to add the "arn:aws:s3:::accau1-s3-demo-bucket/* *" (with the /* * at the end) to both the s3 resource-based and the accb user identity-based policies. In summary, I was only able to list the blob in the bucket when the policies included the resource "arn:aws:s3:::accau1-s3-demo-bucket" and only able to upload to the bucket if the policies included the resource "Resource": "arn:aws:s3:::accau1-s3-demo-bucket/*" hence I added both to be able to read and write from the s3 storage.
+
+Trying to ipload a file from accb, I was receiving the below error when only the "arn:aws:s3:::accau1-s3-demo-bucket" resource was present in the policies.
+```
+aws --profile accbu1 s3 cp /home/andrea/Downloads/Copilot_20250711_152108.png s3://accau1-s3-demo-bucket/
+upload failed: ./Copilot_20250711_152108.png to s3://accau1-s3-demo-bucket/Copilot_20250711_152108.png An error occurred (AccessDenied) when calling the PutObject operation: Access Denied
+
+```
+Using the "arn:aws:s3:::accau1-s3-demo-bucket/*" resource in the policies solved the issue:
+```
+aws --profile accbu1 s3 cp /home/andrea/Downloads/Copilot_20250711_152108.png s3://accau1-s3-demo-bucket/
+upload: ./Copilot_20250711_152108.png to s3://accau1-s3-demo-bucket/Copilot_20250711_152108.png
+
+```
+## Cross account resource access in IAM (using Ansible)
+I configured the same setting with Ansible.
+
+The accau1 and accbu1 users and their aws cli profiles have already been created.
+I created a new s3 bucket with a playbook I named s3_bucket.yml:
+```
+---
+- name: Create S3 bucket
+  hosts: localhost
+  gather_facts: false
+  vars:
+    bucket_name: accau1-s3-demo-bucket-ansible
+  tasks:
+    - name: Create S3 bucket
+      amazon.aws.s3_bucket:
+        name: '{{ bucket_name }}'
+        region: ca-central-1
+        state: present
+        tags:
+          Project: Ansible-S3
+          Environment: Dev
+      register: s3_bucket_result
+
+    - name: Print bucket details
+      ansible.builtin.debug:
+        msg: "Bucket created successfully: {{ s3_bucket_result.name }}"
+```
+and executed it with the command:
+```
+AWS_PROFILE=accau1 ansible-playbook s3_bucket.yml
+```
+Its output was
+```
+[WARNING]: No inventory was parsed, only implicit localhost is available
+[WARNING]: provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'
+
+PLAY [Create S3 bucket] ********************************************************************************************************************************
+
+TASK [Create S3 bucket] ********************************************************************************************************************************
+ok: [localhost]
+
+TASK [Print bucket details] ****************************************************************************************************************************
+ok: [localhost] => {
+    "msg": "Bucket created successfully: accau1-s3-demo-bucket-ansible"
+}
+
+PLAY RECAP *********************************************************************************************************************************************
+localhost                  : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+```
+N.B. My laptop AWS cli profile configuration doesn't have a default profile. I had to specify one and in any case since we are working with 2 profiles wee need a way to tell Ansible which profile to use. There are different ways to specify wich account to use to run the Ansible playbook.
+One can export the profile variable:
+```
+export AWS_PROFILE=my-profile-name
+ansible-playbook my-playbook.yml
+```
+Assign it inline with the Ansible command as I chose to do:
+```
+AWS_PROFILE=my-profile-name ansible-playbook my-playbook.yml
+```
+or specify the profile in the playbook itself:
+```
+- name: Describe EC2 instances
+  amazon.aws.ec2_instance_info:
+    region: us-east-1
+  vars:
+    aws_profile: my-profile-name
+```
+The new bucket has now been created:
+```
+aws --profile accau1 s3api list-buckets
+{
+    "Buckets": [
+        {
+            "Name": "accau1-s3-demo-bucket",
+            "CreationDate": "2025-07-17T19:32:25+00:00"
+        },
+        {
+            "Name": "accau1-s3-demo-bucket-ansible",
+            "CreationDate": "2025-07-21T19:08:32+00:00"
+        }
+    ],
+    "Owner": {
+        "ID": "193ebf5335cf47ea87b27049455fa04604cf8308103b9a33e80f68e85c5777b6"
+    },
+    "Prefix": null
+}
+```
+But no policies are attached to it:
+```
+aws --profile accau1 s3api get-bucket-policy --bucket accau1-s3-demo-bucket-ansible
+
+An error occurred (NoSuchBucketPolicy) when calling the GetBucketPolicy operation: The bucket policy does not exist
+```
+To attach the policy I added the policy attribute in the s3_bucket.yml file like shown below.
+```
+cat s3_bucket.yml 
+---
+- name: Create S3 bucket
+  hosts: localhost
+  gather_facts: false
+  vars:
+    bucket_name: accau1-s3-demo-bucket-ansible
+  tasks:
+    - name: Create S3 bucket
+      amazon.aws.s3_bucket:
+        name: '{{ bucket_name }}'
+        policy: "{{ lookup( 'file','aws-x-account-policy.json' ) }}"
+        region: ca-central-1
+        state: present
+        tags:
+          Project: Ansible-S3
+          Environment: Dev
+      register: s3_bucket_result
+
+    - name: Print bucket details
+      ansible.builtin.debug:
+        msg: "Bucket created successfully: {{ s3_bucket_result.name }}"
+```
+The aws-x-account-policy.json file used in the policy contains the following lines:
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PrincipalAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::816351727812:root"},
+            "Action": "s3:*",
+            "Resource": "arn:aws:s3:::accau1-s3-demo-bucket/*"
+            }
+        ]
+}
+```
+Running the playbook again with 
+```
+AWS_PROFILE=accau1 ansible-playbook s3_bucket.yml
+```
+I receive
+```
+PLAY RECAP *********************************************************************************************************************************************
+localhost                  : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+```
+And I can verifiy that the policy is now been configured
+```
+aws --profile accau1 s3api get-bucket-policy --bucket accau1-s3-demo-bucket-ansible
+{
+    "Policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"PrincipalAccess\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::816351727812:root\"},\"Action\":\"s3:*\",\"Resource\":\"arn:aws:s3:::accau1-s3-demo-bucket-ansible/*\"}]}"
+}
+```
+At this point the configuration  of the s3 bucket is complete, time to configure the user policy.
+I created the fle aws-guest-policy-ansible.json.j2
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect" : "Allow", 
+            "Action" : [ 
+                "s3:Get*", 
+                "s3:List*",
+                "s3:PutObject"
+            ], 
+            "Resource": [
+                "arn:aws:s3:::accau1-s3-demo-bucket-ansible",
+                "arn:aws:s3:::accau1-s3-demo-bucket-ansible/*"
+            ],
+        } 
+    ]
+}
+```
+This is the template to create the policy for the invited account user (accbu1) to access the s3 bucket in the other account (acca)
+To generate the policy I created the playbook aws-create-policy-ansible.yml:
+```
+- name: Create S3 bucket
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+# Create a policy
+    - name: Create IAM Managed Policy
+      amazon.aws.iam_managed_policy:
+        policy_name: "aws-guest-policy-ansible"
+        policy_description: "A Helpful managed policy"
+        policy: "{{ lookup('template', 'aws-guest-policy-ansible.json.j2') }}"
+        state: present
+```
+And run it with:
+```
+AWS_PROFILE=accbu1 ansible-playbook aws-create-policy-ansible.yml
+```
+I received several errors because the user accbu1 needed some permissions to be able to create (e later attach) the policy.
+I assigned to the accbu1 user the necessary permission from the AWS portal by creating and attaching the policy AWS-manage-policies-ansible which reads:
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:ListPolicies",
+                "iam:CreatePolicy",
+                "iam:GetPolicy",
+                "iam:ListPolicyVersions",
+                "iam:GetPolicyVersion",
+                "iam:ListAttachedUserPolicies",
+                "iam:AttachUserPolicy",
+                "iam:GetUser"
+            ],
+            "Resource": [
+                "*"
+            ]
+        }
+    ]
+}
+```
+With the right permission I finally saw the playbook succeed:
+```
+AWS_PROFILE=accbu1 ansible-playbook aws-create-policy-ansible.yml 
+[WARNING]: No inventory was parsed, only implicit localhost is available
+[WARNING]: provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'
+
+PLAY [Create S3 bucket] ********************************************************************************************************************************
+
+TASK [Create IAM Managed Policy] ***********************************************************************************************************************
+ok: [localhost]
+
+PLAY RECAP *********************************************************************************************************************************************
+localhost                  : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+```
+I can now attach the policy to the user with the attach-user-policy-ansible.yml playbook:
+```
+---
+- name: Create S3 bucket
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Attach policy to the accbu1 IAM user
+      amazon.aws.iam_user:
+        name: accbu1 # Replace with the actual username
+        managed_policies:
+          - arn:aws:iam::816351727812:policy/aws-guest-policy-ansible
+        state: present
+```
+which I run with:
+```
+AWS_PROFILE=accbu1 ansible-playbook attach-user-policy-ansible.yml 
+[WARNING]: No inventory was parsed, only implicit localhost is available
+[WARNING]: provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'
+
+PLAY [Create S3 bucket] ********************************************************************************************************************************
+
+TASK [Attach policy to the accbu1 IAM user] ************************************************************************************************************
+[DEPRECATION WARNING]: The 'iam_user' return key is deprecated and will be replaced by 'user'. Both values are returned for now. This feature will be 
+removed from amazon.aws in a release after 2024-05-01. Deprecation warnings can be disabled by setting deprecation_warnings=False in ansible.cfg.
+ok: [localhost]
+
+PLAY RECAP *********************************************************************************************************************************************
+localhost                  : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+```
+The configuration is now complete and I am able to upload files to the new s3 bucket:
+```
+aws --profile accbu1 s3 cp /home/andrea/Downloads/Copilot_20250711_152108.png s3://accau1-s3-demo-bucket-ansible/
+upload: ../Downloads/Copilot_20250711_152108.png to s3://accau1-s3-demo-bucket-ansible/Copilot_20250711_152108.png
+```
+
+## Adding and removing Organizations with the following lines:
+### Add an Organization from the portal
+To manage more accounts - which we can think as resources' containers - from the same user one can use organizations.
+
+To build an organization I logged on as my root account to the AWS portal and searched for organization in the AWS console.
 
 ![AWS email](images/aws_console_search_organization.png?raw=true "Search for organization")
 
@@ -44,7 +499,7 @@ Upon creating an organization we are reminded that the account from which we are
 
 ![Organization management account](images/aws_organization_management_account.png?raw=true "Organization management account")
 
-The important thing here is that governance policies don't apply to the management account and so it is best practice not to build resources in this account. 
+The important thing here is that governance policies don't apply to the management account and so it is best practice **not** to build resources in this account. 
 
 See https://docs.aws.amazon.com/organizations/latest/userguide/orgs_best-practices_mgmt-acct.html for more best practices.
 
@@ -54,9 +509,9 @@ Creating the organization is quick. As soon as the organization is created we ca
 
 ![Manage organization accounts](images/aws_add_an_account_to_an_organization.png?raw=true "Manage organization accounts")
 
-I invited the account I created using the same email address of the management account. To do so I had to use the account id in the invitation since the email address with the added + symbel and characters before the @ symbol did not work.
+I invited the account I created using the same email address of the management account. To do so I had to use the account id in the invitation since the email address with the added + symbol and characters before the @ symbol did not work.
 
-I received an email with the invitation and a link but - because of the common email address - to accept the invitation I had to log on to the invited account console using its the root user, moved to the "AWS Organization" section and clicked on the "View 1 invitation" button.
+I received an email with the invitation and a link but - because of the common email address - the link did not wok and to accept the invitation I had to log on to the invited account console using its the root user, moved to the "AWS Organization" section and clicked on the "View 1 invitation" button.
 
 ![Oganization invitation received](images/aws_organization_invitation_received.png?raw=true "Oganization invitation received")
 
@@ -76,7 +531,7 @@ At https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-enable-root-access.h
 
 Before looking at that I want to try and remove the organization and recreate it via command line.
 
-## Remove an Organization from the portal
+### Remove an Organization from the portal
 
 To remove the organization I logged on the management account with the root usernd navigate to the "AWS Organizations" service "Settings new" link.
 
@@ -86,9 +541,124 @@ As the above picture suggested I proceeded with removing the non managemet accou
 
 ![Organization account remove error](images/aws_remove_account_from_organization_error.png?raw=true "Organization account remove error")
 
-The missing information were billing information. Once the account is no longer part of the organization it is responsible to pay its own bills. Once entered the credit card details the operation required a wait period before allowing the account to be removed.
+The missing information were billing information. Once the account is no longer part of the organization it is responsible to pay its own bills. Once entered the credit card details to satisfy the missing billing information, the deletion operation returned a message stating that a wait period is necessary before allowing the account to be removed.
+
+I thought I had to wait some minutes or a couple of hours but it looks like the time to wait is seven days!
+The article at 
+https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_accounts_remove.html?icmpid=docs_orgs_console#leave-without-all-info
+
+reads:
+
+"
+**You must wait until at least seven days after the account was created**
+
+To remove an account that you created in the organization, you must wait until at least seven days after the account was created. Invited accounts aren't subject to this waiting period.
+"
+
+The organization can be removed when the management account is its only member. From the "AWS Organizarion / Settings new" click on the "Delete organization" button and confirm by typing the organization id in the "Delete organization" window.
+
+![Organization deletion confirmation](images/aws_organization_delete_confirmation.png?raw=true "Organization deletion confirmation")
+### Add an Organization from the command line
+#### Create an aws cli profile
+The first thing to do to add an organization or any other AWS resourse via command line is to authenticate with AWS.
+
+To authenticate we need a profile which can create with the command:
+```
+aws configure --profile profile-name
+```
+I specified a profile name, without that the information provided would be added to a default domain.
+
+The command will ask to enter the following:
+```
+AWS Access Key ID [None]: [20 chars key]
+AWS Secret Access Key [None]: [40 chars key]
+Default region name [None]: [closest region to you e.g.: ca-central-1]
+Default output format [None]: [ one of json (default), yaml, yaml-stream, text, table] 
+
+```
+To see the profiles info I issued
+```
+aws configure list
+      Name                    Value             Type    Location
+      ----                    -----             ----    --------
+   profile                <not set>             None    None
+access_key                <not set>             None    None
+secret_key                <not set>             None    None
+    region                <not set>             None    None
+```
+but this only lists the default profile, so I used:
+```
+aws configure --profile profile-name list
+      Name                    Value             Type    Location
+      ----                    -----             ----    --------
+   profile                   profile-name     manual    --profile
+access_key     ****************GV3A shared-credentials-file    
+secret_key     ****************/pAq shared-credentials-file    
+    region             ca-central-1      config-file    ~/.aws/config
+```
+To see the profile list the command is:
+```
+aws configure list-profiles
+profile-name
+```
+At this point 2 files containing my account's information have been created in the ~/.aws directory and I can issue commands via cli.
+
+I used the command:
+```
+aws --profile profile-name s3api list-buckets
+```
+for a test.
+
+#### Create an aws organization
+To create the organization, the command is:
+```
+aws --profile profile-name organizations create-organization --feature-set ALL
+```
+N.B.: I specified the profile because I don't have a default profile set. Also the --feature-set parameter is set to the default value and therefore I could have omitted it.
+
+The output of the command is similar to the below:
+```
+{
+    "Organization": {
+        "Id": "x-xxxxxxxxxx",
+        "Arn": "arn:aws:organizations::111111111111:organization/x-xxxxxxxxxx",
+        "FeatureSet": "ALL",
+        "MasterAccountArn": "arn:aws:organizations::111111111111:account/x-xxxxxxxxxx/111111111111",
+        "MasterAccountId": "111111111111",
+        "MasterAccountEmail": "email@domain.tld",
+        "AvailablePolicyTypes": [
+            {
+                "Type": "SERVICE_CONTROL_POLICY",
+                "Status": "ENABLED"
+            }
+        ]
+    }
+}
+```
+If I try to run the command again I will receive the error:
+```
+An error occurred (AlreadyInOrganizationException) when calling the CreateOrganization operation: The AWS account is already a member of an organization.
+```
+To check if an organization exists I can use the command:
+```
+aws --profile profile-name organizations describe-organization
+```
+There are a lot of subcommands for the organizations topic. To repeat what we did from the portal we can use:
+```
+aws --profile andrea organizations create-account --email rzand+a@hotmail.com --account-name auser
+```
+we can check the organization's members with:
+```
+aws --profile andrea organizations list-accounts
+```
+And invite an existing account with:
+```
+aws organizations invite-account-to-organization --target '{"Type": "EMAIL", "Id": "email[+x]@domain.tld"}' --notes "This is a request to join ABC organization."
+```
+I did not try the above command because it would take a lot of time for me to remove the invited account.
 
 
 
-## Add AWS IAM Identity Centerfrom the portal
+
+## Add AWS IAM Identity Center from the portal
 ## Add the Control Tower from the portal
