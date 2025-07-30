@@ -482,6 +482,309 @@ aws --profile accbu1 s3 cp /home/andrea/Downloads/Copilot_20250711_152108.png s3
 upload: ../Downloads/Copilot_20250711_152108.png to s3://accau1-s3-demo-bucket-ansible/Copilot_20250711_152108.png
 ```
 
+## Cross account resource access in IAM (using Terraform)
+I configured the same setting again, on a different s3 bucket using Terraform.
+
+The accau1 and accbu1 users and their aws cli profiles have already been created and even though this is not my preferred choice I will use them to run Terraform. What I don't like is the fact that the credentials are written on my system, although in a hidden file in my user profile. Will explore later how to avoid this.
+
+I started by creating 2 files: provider.tf for the aws configuration:
+```
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+
+# Configure the AWS Provider
+provider "aws" {
+  region  = "ca-central-1"
+  profile = "accau1"
+}
+``` 
+and s3.tf that creates the bucket:
+```
+resource "aws_s3_bucket" "s3_learn_aws" {
+  bucket = "accau1-s3-demo-bucket-terraform"
+
+  tags = {
+    method      = "terraform"
+    environment = "dev"
+  }
+}
+```
+These are minimal configurations and have hardcoded values like the name of the profile I want to use to create the resource: accau1.
+
+I have then moved into the directory where I stored my files and initialized terraform:
+```
+terraform init
+```
+and received a successful output:
+```
+Initializing the backend...
+Initializing provider plugins...
+- Finding latest version of hashicorp/aws...
+- Installing hashicorp/aws v6.6.0...
+- Installed hashicorp/aws v6.6.0 (signed by HashiCorp)
+Terraform has created a lock file .terraform.lock.hcl to record the provider
+selections it made above. Include this file in your version control repository
+so that Terraform can guarantee to make the same selections by default when
+you run "terraform init" in the future.
+
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+```
+I validated the terraform code with:
+```
+terraform validate
+```
+and obtained the output:
+```
+Success! The configuration is valid.
+```
+Run the terraform plan:
+```
+terraform plan
+```
+and received the output:
+```
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with
+the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # aws_s3_bucket.s3_learn_aws will be created
+  + resource "aws_s3_bucket" "s3_learn_aws" {
+      + acceleration_status         = (known after apply)
+      + acl                         = (known after apply)
+      + arn                         = (known after apply)
+      + bucket                      = "accau1-s3-demo-bucket-terraform"
+      + bucket_domain_name          = (known after apply)
+      + bucket_prefix               = (known after apply)
+      + bucket_region               = (known after apply)
+      + bucket_regional_domain_name = (known after apply)
+      + force_destroy               = false
+      + hosted_zone_id              = (known after apply)
+      + id                          = (known after apply)
+      + object_lock_enabled         = (known after apply)
+      + policy                      = (known after apply)
+      + region                      = "ca-central-1"
+      + request_payer               = (known after apply)
+      + tags                        = {
+          + "environment" = "dev"
+          + "method"      = "terraform"
+        }
+      + tags_all                    = {
+          + "environment" = "dev"
+          + "method"      = "terraform"
+        }
+      + website_domain              = (known after apply)
+      + website_endpoint            = (known after apply)
+
+      + cors_rule (known after apply)
+
+      + grant (known after apply)
+
+      + lifecycle_rule (known after apply)
+
+      + logging (known after apply)
+
+      + object_lock_configuration (known after apply)
+
+      + replication_configuration (known after apply)
+
+      + server_side_encryption_configuration (known after apply)
+
+      + versioning (known after apply)
+
+      + website (known after apply)
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't guarantee to take exactly these actions
+if you run "terraform apply" now.
+```
+Ultimately run the terraform apply:
+```
+terraform apply
+```
+which returned the output:
+```
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with
+the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # aws_s3_bucket.s3_learn_aws will be created
+  + resource "aws_s3_bucket" "s3_learn_aws" {
+      + acceleration_status         = (known after apply)
+      + acl                         = (known after apply)
+      + arn                         = (known after apply)
+      + bucket                      = "accau1-s3-demo-bucket-terraform"
+      + bucket_domain_name          = (known after apply)
+      + bucket_prefix               = (known after apply)
+      + bucket_region               = (known after apply)
+      + bucket_regional_domain_name = (known after apply)
+      + force_destroy               = false
+      + hosted_zone_id              = (known after apply)
+      + id                          = (known after apply)
+      + object_lock_enabled         = (known after apply)
+      + policy                      = (known after apply)
+      + region                      = "ca-central-1"
+      + request_payer               = (known after apply)
+      + tags                        = {
+          + "environment" = "dev"
+          + "method"      = "terraform"
+        }
+      + tags_all                    = {
+          + "environment" = "dev"
+          + "method"      = "terraform"
+        }
+      + website_domain              = (known after apply)
+      + website_endpoint            = (known after apply)
+
+      + cors_rule (known after apply)
+
+      + grant (known after apply)
+
+      + lifecycle_rule (known after apply)
+
+      + logging (known after apply)
+
+      + object_lock_configuration (known after apply)
+
+      + replication_configuration (known after apply)
+
+      + server_side_encryption_configuration (known after apply)
+
+      + versioning (known after apply)
+
+      + website (known after apply)
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+aws_s3_bucket.s3_learn_aws: Creating...
+aws_s3_bucket.s3_learn_aws: Creation complete after 2s [id=accau1-s3-demo-bucket-terraform]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+```
+ I then added the s3_policy_x_account_access.tf file to configure the policy that allow the accb identities to access the bucket: 
+ ```
+resource "aws_s3_bucket_policy" "allow_access_from_another_account" {
+  bucket = aws_s3_bucket.s3_learn_aws.id
+  policy = data.aws_iam_policy_document.allow_access_from_another_account.json
+}
+
+data "aws_iam_policy_document" "allow_access_from_another_account" {
+  statement {
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::816351727812:root"]
+    }
+    sid = "PrincipalAccess"
+    effect = "Allow"
+    actions = [
+        "s3:*",
+    ]
+
+    resources = [
+      "${aws_s3_bucket.s3_learn_aws.arn}/*",
+    ]
+  }
+}
+```
+After running the terraform apply I verified from the AWS portal that the policy attached to the new bucket was the same as the ones attached when I created the resources via cli or ansible.
+
+Time now to create the guest policy in the accb account. In a different directory I created the files provider.tf:
+```
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+
+# Configure the AWS Provider
+provider "aws" {
+  region  = "ca-central-1"
+  profile = "accbu1"
+}
+```
+and aws_guest_policy.tf:
+```
+resource "aws_iam_policy" "aws_guest_policy_terraform" {
+  name        = "aws-guest-policy-terraform"
+  description = "Policy to allow read access to a specific S3 bucket"
+  policy      = data.aws_iam_policy_document.aws_guest_policy_document.json
+}
+data "aws_iam_policy_document" "aws_guest_policy_document" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket",
+      "s3:PutObject",
+    ]
+
+    resources = [
+      "arn:aws:s3:::accau1-s3-demo-bucket-terraform",
+      "arn:aws:s3:::accau1-s3-demo-bucket-terraform/*",
+    ]
+  }
+}
+```
+After running the terraform apply command the new policy aws-guest-policy-terraform shows up in the accb tenant.
+
+To attach the policy to the accbu1 user I wrote the file attach_guest_policy.tf:
+```
+# Attach an AWS Managed Policy to the user
+resource "aws_iam_user_policy_attachment" "s3_guest_policy_attachment" {
+  user       = "accbu1"
+  policy_arn = "arn:aws:iam::816351727812:policy/aws-guest-policy-terraform"
+}
+```
+Running the terraform apply one more time the policy applied to the user accbu1. N.B.: the user accbu1 has been granted the necessary permission to run the above configurations during the ansible configureation reported above.
+
+We can now try to add a file to the acca s3 bucket using the accbu1 (different account) user:
+```
+aws --profile accbu1 s3 cp /home/andrea/Downloads/Copilot_20250711_152108.png s3://accau1-s3-demo-bucket-terraform/
+```
+and the output
+```
+
+upload: ../../../../../../Downloads/Copilot_20250711_152108.png to s3://accau1-s3-demo-bucket-terraform/Copilot_20250711_152108.png
+```
+confirmed that the file has been uploaded.
+
+And I can also list the blobs in the bucket:
+```
+aws --profile accbu1 s3 ls s3://accau1-s3-demo-bucket-terraform
+2025-07-29 16:02:57     984885 Copilot_20250711_152108.png
+```
+
 ## Adding and removing Organizations with the following lines:
 ### Add an Organization from the portal
 To manage more accounts - which we can think as resources' containers - from the same user one can use organizations.
